@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>ELS Plus Converter</title>
+<style>
+    :root {
+        --bg-main: #0a0a0a;
+        --bg-card: #141414;
+        --border: #262626;
+        --accent: #ffffff;
+        --text-primary: #e5e5e5;
+        --text-secondary: #a3a3a3;
+        --input-bg: #000000;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg-main);
+        color: var(--text-primary);
+        line-height: 1.6;
+        margin: 0;
+        padding: 40px 20px;
+        display: flex;
+        justify-content: center;
+    }
+
+    .container {
+        max-width: 900px;
+        width: 100%;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        letter-spacing: -0.025em;
+        margin-bottom: 30px;
+        color: var(--accent);
+    }
+
+    h3 {
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+    }
+
+    textarea {
+        width: 100%;
+        height: 240px;
+        background: var(--input-bg);
+        color: #d1d5db;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 12px;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 13px;
+        resize: vertical;
+        margin-bottom: 20px;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+
+    textarea:focus {
+        border-color: #404040;
+    }
+
+    .button-group {
+        margin-bottom: 40px;
+        display: flex;
+        gap: 12px;
+    }
+
+    button {
+        background: var(--accent);
+        color: var(--bg-main);
+        border: none;
+        padding: 10px 20px;
+        font-size: 14px;
+        font-weight: 500;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+
+    button:hover {
+        opacity: 0.9;
+    }
+
+    button.secondary {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+    }
+
+    button.secondary:hover {
+        background: var(--bg-card);
+    }
+
+    hr {
+        border: 0;
+        border-top: 1px solid var(--border);
+        margin: 40px 0;
+    }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h1>ELS Plus Converter</h1>
+
+    <section>
+        <h3>Alter ELS / Lua Code</h3>
+        <textarea id="input" placeholder="Hier den alten Code einfügen..."></textarea>
+        
+        <div class="button-group">
+            <button onclick="convert()">Konvertieren</button>
+            <button class="secondary" onclick="download()">JSON herunterladen</button>
+        </div>
+    </section>
+
+    <hr>
+
+    <section>
+        <h3>Neue JSON Datei</h3>
+        <textarea id="output" readonly placeholder="Das Ergebnis erscheint hier..."></textarea>
+    </section>
+</div>
+
+<script>
+function convert() {
+    const input = document.getElementById("input").value;
+
+    function parseExtrasBlock(name) {
+        const extras = {};
+        const regex = new RegExp(name + "\\s*=\\s*{([\\s\\S]*?)}", "m");
+        const match = input.match(regex);
+        if (!match) return extras;
+        const block = match[1];
+        [...block.matchAll(/\[\s*(\d+)\s*\]\s*=\s*"([^"]+)"/g)].forEach(m => {
+            const id = m[1];
+            if (!extras[id]) extras[id] = { patterns: [], envLights: [] };
+            extras[id].patterns.push(m[2]);
+        });
+        [...block.matchAll(/(\d+)\s*(,|$)/g)].forEach(m => {
+            const id = m[1];
+            if (!extras[id]) extras[id] = { patterns: [], envLights: [] };
+        });
+        return extras;
+    }
+
+    function parseEnvLightsInto(extras) {
+        const regex = /envLights\s*=\s*{([\s\S]*?)\n\s*}/m;
+        const match = input.match(regex);
+        if (!match) return;
+        const block = match[1];
+        [...block.matchAll(/\[\s*(\d+)\s*\]\s*=\s*{([\s\S]*?)}\s*(?=\[\d+\]|$)/g)].forEach(m => {
+            const id = m[1];
+            const content = m[2];
+            const lights = [...content.matchAll(/{([\s\S]*?)}/g)].map(o => {
+                const light = {};
+                [...o[1].matchAll(/(\w+)\s*=\s*(\{[^}]*\}|".*?"|[\d.]+|true|false)/g)].forEach(p => {
+                    let v = p[2].trim();
+                    if (v === "true") v = true;
+                    else if (v === "false") v = false;
+                    else if (!isNaN(v)) v = Number(v);
+                    else if (v.startsWith("{")) {
+                        v = [...v.matchAll(/(\w+)\s*=\s*([\d.]+)/g)]
+                            .reduce((a,c)=>{a[c[1]]=Number(c[2]);return a;},{});
+                    } else v = v.replace(/"/g,"");
+                    light[p[1]] = v;
+                });
+                return light;
+            });
+            if (extras[id]) extras[id].envLights = lights;
+        });
+    }
+
+    const primaryExtras     = parseExtrasBlock("lightExtras");
+    const secondaryExtras   = parseExtrasBlock("frontExtras");
+    const rearWarningExtras = parseExtrasBlock("rearExtras");
+    const matrixExtras      = parseExtrasBlock("matrixExtras");
+    const sceneExtras       = parseExtrasBlock("sceneExtras");
+
+    [primaryExtras, secondaryExtras, rearWarningExtras, matrixExtras, sceneExtras]
+        .forEach(parseEnvLightsInto);
+
+    const vehicleName = (input.match(/GetHashKey\("([^"]+)"\)/) || [])[1] || "unknown_vehicle";
+    const layout = (input.match(/layout\s*=\s*"([^"]+)"/) || [])[1] || "UNKNOWN";
+
+    const json = {
+        spawnName: vehicleName,
+        vehicleName: vehicleName,
+        layout: layout,
+        noFlash: input.includes("noFlash = true"),
+        siren: {
+            directional: input.includes("sirenDirectional = true"),
+            range: Number(input.match(/sirenRange\s*=\s*([\d.]+)/)?.[1]) || 300,
+            hasMegaphone: input.includes("hasMegaphone = true"),
+            wmTones: [...input.matchAll(/"SIREN_[A-Z_]+"/g)].map(m => m[0]),
+            allowTrafficClear: input.includes("allowTrafficClear = true")
+        },
+        functions: {
+            primary: { extras: primaryExtras, envLights: [], enabledByDefault: true },
+            secondary: { extras: secondaryExtras, envLights: [], enabledByDefault: true },
+            rearWarning: { extras: rearWarningExtras, envLights: [], enabledByDefault: true },
+            matrix: { extras: matrixExtras, envLights: [], enabledByDefault: true },
+            scene: { extras: sceneExtras, envLights: [], enabledByDefault: true },
+            estelle: { extras: {}, envLights: [], enabledByDefault: true }
+        }
+    };
+
+    document.getElementById("output").value = JSON.stringify(json, null, 4);
+}
+
+function download() {
+    const output = document.getElementById("output").value;
+    if (!output) return;
+    const json = JSON.parse(output);
+    const name = json.vehicleName || "vehicle";
+    const blob = new Blob([output], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name + ".json";
+    a.click();
+}
+</script>
+
+</body>
+</html>
