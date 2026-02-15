@@ -2,231 +2,242 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>ELS Plus Converter</title>
+<title>ELS PRO zu ELS PLUS Converter</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <style>
-    :root {
-        --bg-main: #0a0a0a;
-        --bg-card: #141414;
-        --border: #262626;
-        --accent: #ffffff;
-        --text-primary: #e5e5e5;
-        --text-secondary: #a3a3a3;
-        --input-bg: #000000;
-    }
-
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        background: var(--bg-main);
-        color: var(--text-primary);
-        line-height: 1.6;
-        margin: 0;
-        padding: 40px 20px;
-        display: flex;
-        justify-content: center;
-    }
-
-    .container {
-        max-width: 900px;
-        width: 100%;
-    }
-
-    h1 {
-        font-size: 1.5rem;
-        font-weight: 600;
-        letter-spacing: -0.025em;
-        margin-bottom: 30px;
-        color: var(--accent);
-    }
-
-    h3 {
-        font-size: 0.875rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--text-secondary);
-        margin-bottom: 10px;
-    }
-
-    textarea {
-        width: 100%;
-        height: 240px;
-        background: var(--input-bg);
-        color: #d1d5db;
-        border: 1px solid var(--border);
-        border-radius: 4px;
-        padding: 12px;
-        font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-        font-size: 13px;
-        resize: vertical;
-        margin-bottom: 20px;
-        outline: none;
-        transition: border-color 0.2s;
-    }
-
-    textarea:focus {
-        border-color: #404040;
-    }
-
-    .button-group {
-        margin-bottom: 40px;
-        display: flex;
-        gap: 12px;
-    }
-
-    button {
-        background: var(--accent);
-        color: var(--bg-main);
-        border: none;
-        padding: 10px 20px;
-        font-size: 14px;
-        font-weight: 500;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: opacity 0.2s;
-    }
-
-    button:hover {
-        opacity: 0.9;
-    }
-
-    button.secondary {
-        background: transparent;
-        color: var(--text-primary);
-        border: 1px solid var(--border);
-    }
-
-    button.secondary:hover {
-        background: var(--bg-card);
-    }
-
-    hr {
-        border: 0;
-        border-top: 1px solid var(--border);
-        margin: 40px 0;
-    }
+:root{
+    --bg:#0a0a0a;
+    --border:#262626;
+    --text:#e5e5e5;
+    --sub:#a3a3a3;
+    --input:#000;
+}
+body{
+    font-family:system-ui,Segoe UI,Roboto;
+    background:var(--bg);
+    color:var(--text);
+    margin:0;
+    padding:40px 20px;
+}
+.container{max-width:900px;margin:auto}
+textarea{
+    width:100%;
+    height:260px;
+    background:var(--input);
+    color:#d1d5db;
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:12px;
+    font-family:monospace;
+    font-size:13px;
+    margin-bottom:20px;
+}
+button{
+    background:#fff;
+    color:#000;
+    border:none;
+    padding:12px 24px;
+    font-weight:600;
+    border-radius:4px;
+    cursor:pointer;
+    margin-right:10px;
+}
+h3{
+    color:var(--sub);
+    font-size:.9rem;
+    text-transform:uppercase;
+}
+.actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+}
 </style>
 </head>
+
 <body>
-
 <div class="container">
-    <h1>ELS Plus Converter</h1>
+<h1>ELS PRO zu ELS PLUS Converter</h1>
 
-    <section>
-        <h3>Alter ELS / Lua Code</h3>
-        <textarea id="input" placeholder="Hier den alten Code einfügen..."></textarea>
-        
-        <div class="button-group">
-            <button onclick="convert()">Konvertieren</button>
-            <button class="secondary" onclick="download()">JSON herunterladen</button>
-        </div>
-    </section>
+<h3>1. Lua einfügen</h3>
+<textarea id="input"></textarea>
 
-    <hr>
-
-    <section>
-        <h3>Neue JSON Datei</h3>
-        <textarea id="output" readonly placeholder="Das Ergebnis erscheint hier..."></textarea>
-    </section>
+<div class="actions">
+    <button onclick="convert()">Konvertieren</button>
 </div>
 
+<h3>2. JSON Output</h3>
+<textarea id="output" readonly></textarea>
+
+<button onclick="downloadJSON()">JSON herunterladen</button>
+
+<h3>3. Füge die heruntergeladene Datei in <code>config/fahrzeuge</code></h3>
+<p>Speichere die heruntergeladene JSON-Datei im Verzeichnis <code>config/fahrzeuge</code>, damit sie vom ELS PLUS erkannt wird.</p>
+
+
 <script>
-function convert() {
-    const input = document.getElementById("input").value;
+let lastResult = null;
 
-    function parseExtrasBlock(name) {
-        const extras = {};
-        const regex = new RegExp(name + "\\s*=\\s*{([\\s\\S]*?)}", "m");
-        const match = input.match(regex);
-        if (!match) return extras;
-        const block = match[1];
-        [...block.matchAll(/\[\s*(\d+)\s*\]\s*=\s*"([^"]+)"/g)].forEach(m => {
-            const id = m[1];
-            if (!extras[id]) extras[id] = { patterns: [], envLights: [] };
-            extras[id].patterns.push(m[2]);
-        });
-        [...block.matchAll(/(\d+)\s*(,|$)/g)].forEach(m => {
-            const id = m[1];
-            if (!extras[id]) extras[id] = { patterns: [], envLights: [] };
-        });
-        return extras;
+/* ======= Hilfsfunktionen ======= */
+function findVal(txt,key){
+    const m=txt.match(new RegExp(key+"\\s*=\\s*([\\d.-]+)","i"));
+    return m?parseFloat(m[1]):0;
+}
+function getBraceContent(txt,start){
+    let lvl=0,s=-1;
+    for(let i=start;i<txt.length;i++){
+        if(txt[i]==="{"){ if(s<0)s=i; lvl++; }
+        else if(txt[i]==="}"){
+            lvl--;
+            if(lvl===0) return txt.slice(s,i+1);
+        }
     }
+    return "";
+}
+function getRotationX(block){
+    let m=block.match(/rotation\s*=\s*{[^}]*x\s*=\s*([-\d.]+)/i);
+    return m?+m[1]:0;
+}
+function getColorName(r,g,b){
+    if(b>150 && r<100) return "Blau";
+    if(r>150 && b<100) return "Rot";
+    if(r>150 && g>150) return "Gelb";
+    return "Blau";
+}
 
-    function parseEnvLightsInto(extras) {
-        const regex = /envLights\s*=\s*{([\s\S]*?)\n\s*}/m;
-        const match = input.match(regex);
-        if (!match) return;
-        const block = match[1];
-        [...block.matchAll(/\[\s*(\d+)\s*\]\s*=\s*{([\s\S]*?)}\s*(?=\[\d+\]|$)/g)].forEach(m => {
-            const id = m[1];
-            const content = m[2];
-            const lights = [...content.matchAll(/{([\s\S]*?)}/g)].map(o => {
-                const light = {};
-                [...o[1].matchAll(/(\w+)\s*=\s*(\{[^}]*\}|".*?"|[\d.]+|true|false)/g)].forEach(p => {
-                    let v = p[2].trim();
-                    if (v === "true") v = true;
-                    else if (v === "false") v = false;
-                    else if (!isNaN(v)) v = Number(v);
-                    else if (v.startsWith("{")) {
-                        v = [...v.matchAll(/(\w+)\s*=\s*([\d.]+)/g)]
-                            .reduce((a,c)=>{a[c[1]]=Number(c[2]);return a;},{});
-                    } else v = v.replace(/"/g,"");
-                    light[p[1]] = v;
-                });
-                return light;
+/* ======= EnvLights parsen ======= */
+function parseGlobalEnvLights(lua){
+    const result={};
+    const idx=lua.toLowerCase().indexOf("envlights");
+    if(idx===-1) return result;
+    const block=getBraceContent(lua,lua.indexOf("{",idx));
+    const idRe=/\[\s*(\d+)\s*\]\s*=/g;
+    let m;
+    while((m=idRe.exec(block))){
+        const id=m[1];
+        const list=getBraceContent(block,m.index+m[0].length);
+        const lights=[];
+        let p=1;
+        while(p<list.length){
+            const s=list.indexOf("{",p);
+            if(s===-1) break;
+            const l=getBraceContent(list,s);
+            p=s+l.length;
+            if(!l.includes("offset")) continue;
+            const c=l.match(/color\s*=\s*{([^}]*)}/i);
+            const r=c?findVal(c[1],"r"):0;
+            const g=c?findVal(c[1],"g"):0;
+            const b=c?findVal(c[1],"b"):255;
+            const o=l.match(/offset\s*=\s*{([^}]*)}/i);
+
+            // angle zuerst, dann restliche Felder
+            lights.push({
+                angle: getRotationX(l),
+                dir: {x:0,y:1,z:0},
+                type: "spot",
+                color: getColorName(r,g,b),
+                intensity: findVal(l,"intensity")||2.5,
+                offset: {
+                    x:o?findVal(o[1],"x"):0,
+                    y:o?findVal(o[1],"y"):0,
+                    z:o?findVal(o[1],"z"):0
+                },
+                range: findVal(l,"range")||25
             });
-            if (extras[id]) extras[id].envLights = lights;
-        });
+        }
+        result[id]=lights;
+    }
+    return result;
+}
+
+/* ======= Extras (patterns + envLights) ======= */
+function parseExtras(lua,name,globalEnvLights){
+    const out={};
+    const idx=lua.indexOf(name);
+    if(idx===-1) return out;
+    const block=getBraceContent(lua,lua.indexOf("{",idx));
+    const idRe=/\[\s*(\d+)\s*\]\s*=/g;
+    let m;
+    while((m=idRe.exec(block))){
+        const id=m[1];
+        let pos=m.index+m[0].length;
+        while(block[pos]===" "||block[pos]==="\n"||block[pos]==="\t") pos++;
+        let content="";
+        if(block[pos]==='"'){
+            const end=block.indexOf('"',pos+1);
+            content=block.slice(pos,end+1);
+        }else{
+            content=getBraceContent(block,pos);
+        }
+        const pm=content.match(/"([^"]+)"/);
+        out[id]={
+            patterns: pm?[pm[1]]:[],
+            envLights: globalEnvLights[id]||[]
+        };
+    }
+    return out;
+}
+
+/* ======= Konvertieren ======= */
+function convert(){
+    const lua = document.getElementById("input").value;
+    const name = (lua.match(/GetHashKey\("([^"]+)"\)/) || [])[1] || "vehicle";
+    const globalEnvLights = parseGlobalEnvLights(lua);
+
+    // Siren direkt unter spawnName
+    const siren = {};
+    
+    // directional
+    const dirMatch = lua.match(/sirenDirectional\s*=\s*(true|false)/i);
+    siren.directional = dirMatch ? dirMatch[1] === "true" : true;
+
+    // range
+    const rangeMatch = lua.match(/sirenRange\s*=\s*([0-9.]+)/i);
+    siren.range = rangeMatch ? parseFloat(rangeMatch[1]) : 50;
+
+    // hasMegaphone
+    const hasMegaMatch = lua.match(/hasMegaphone\s*=\s*(true|false)/i);
+    siren.hasMegaphone = hasMegaMatch ? hasMegaMatch[1] === "true" : true;
+
+    // allowTrafficClear
+    const allowMatch = lua.match(/allowTrafficClear\s*=\s*(true|false)/i);
+    siren.allowTrafficClear = allowMatch ? allowMatch[1] === "true" : true;
+
+    // wmTones
+    siren.wmTones = [];
+    const tonesMatch = lua.match(/wmTones\s*=\s*{([^}]*)}/i);
+    if(tonesMatch && tonesMatch[1]){
+        const matches = tonesMatch[1].match(/"([^"]+)"/g);
+        if(matches) matches.forEach(m => siren.wmTones.push(m.replace(/"/g,'')));
     }
 
-    const primaryExtras     = parseExtrasBlock("lightExtras");
-    const secondaryExtras   = parseExtrasBlock("frontExtras");
-    const rearWarningExtras = parseExtrasBlock("rearExtras");
-    const matrixExtras      = parseExtrasBlock("matrixExtras");
-    const sceneExtras       = parseExtrasBlock("sceneExtras");
-
-    [primaryExtras, secondaryExtras, rearWarningExtras, matrixExtras, sceneExtras]
-        .forEach(parseEnvLightsInto);
-
-    const vehicleName = (input.match(/GetHashKey\("([^"]+)"\)/) || [])[1] || "unknown_vehicle";
-    const layout = (input.match(/layout\s*=\s*"([^"]+)"/) || [])[1] || "UNKNOWN";
-
-    const json = {
-        spawnName: vehicleName,
-        vehicleName: vehicleName,
-        layout: layout,
-        noFlash: input.includes("noFlash = true"),
-        siren: {
-            directional: input.includes("sirenDirectional = true"),
-            range: Number(input.match(/sirenRange\s*=\s*([\d.]+)/)?.[1]) || 300,
-            hasMegaphone: input.includes("hasMegaphone = true"),
-            wmTones: [...input.matchAll(/"SIREN_[A-Z_]+"/g)].map(m => m[0]),
-            allowTrafficClear: input.includes("allowTrafficClear = true")
-        },
+    lastResult = {
+        spawnName: name,
+        vehicleName: name,
+        siren: siren,
         functions: {
-            primary: { extras: primaryExtras, envLights: [], enabledByDefault: true },
-            secondary: { extras: secondaryExtras, envLights: [], enabledByDefault: true },
-            rearWarning: { extras: rearWarningExtras, envLights: [], enabledByDefault: true },
-            matrix: { extras: matrixExtras, envLights: [], enabledByDefault: true },
-            scene: { extras: sceneExtras, envLights: [], enabledByDefault: true },
-            estelle: { extras: {}, envLights: [], enabledByDefault: true }
+            primary: { extras: parseExtras(lua,"lightExtras",globalEnvLights), envLights: [], enabledByDefault:true },
+            secondary: { extras: parseExtras(lua,"frontExtras",globalEnvLights), envLights: [], enabledByDefault:true },
+            rearWarning: { extras: parseExtras(lua,"rearExtras",globalEnvLights), envLights: [], enabledByDefault:true }
         }
     };
 
-    document.getElementById("output").value = JSON.stringify(json, null, 4);
+    document.getElementById("output").value = JSON.stringify(lastResult,null,4);
 }
 
-function download() {
-    const output = document.getElementById("output").value;
-    if (!output) return;
-    const json = JSON.parse(output);
-    const name = json.vehicleName || "vehicle";
-    const blob = new Blob([output], { type: "application/json" });
-    const a = document.createElement("a");
+/* ======= JSON Download ======= */
+function downloadJSON(){
+    if(!lastResult){
+        alert("Bitte zuerst konvertieren.");
+        return;
+    }
+    const blob = new Blob([JSON.stringify(lastResult,null,4)],{type:"application/json"});
+    const a=document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = name + ".json";
+    a.download = (lastResult.spawnName||"vehicle")+".json";
     a.click();
+    URL.revokeObjectURL(a.href);
 }
 </script>
-
 </body>
 </html>
